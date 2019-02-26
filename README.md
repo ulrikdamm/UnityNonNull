@@ -2,6 +2,8 @@
 
 Small package to add a `[NonNull]` attribute. Put this on a field to make it highlight in the editor when the field haven't been assigned, or on a class to automatically make it apply to all fields in that class. When you put in on a class, you can also put `[AllowNull]` on specific fields to allow them to be unassigned.
 
+![](http://ufd.dk/NonNullEditor.png)
+
 The script will also produce an error when you play the game in the editor or when you make a build if you have any unassigned references in your scenes.
 
 This is handy to make sure something doesn't get unassigned by accident. You can also check wether an object is still in use or not by removing it, and then making a build, and see if you get any errors for unassigned references.
