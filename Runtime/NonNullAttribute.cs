@@ -17,7 +17,7 @@ public class AllowNullAttribute : PropertyAttribute {}
 
 #if UNITY_EDITOR
 [CustomPropertyDrawer(typeof(Object), useForChildren: true)]
-public class WhateverDrawer : PropertyDrawer {
+public class DefaultObjectDrawer : PropertyDrawer {
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
         EditorGUI.BeginProperty(position, label, property);
         
@@ -101,7 +101,7 @@ class FindNonNull {
 		}
 	}
     
-    [MenuItem("Custom/Check for nonnulls")]
+    [MenuItem("Assets/NonNull/Check for unassigned references in current scene")]
 	public static bool findAllNonNulls() {
 		var anyNulls = false;
 		
