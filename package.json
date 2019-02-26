@@ -1,0 +1,10 @@
+{
+	"name": "co.northplay.nonnull",
+	"displayName": "NonNull attribute",
+	"version": "1.0",
+	"unity": "2018.1",
+	"description": "Includes the [NonNull] attribute for fields or classes, which allows visual indication in the editor that a reference is unassigned, and errors when starting the game or building the player. Also includes [AllowsNull] for fields in [NonNull] classes that can be unassigned.",
+	"keywords": ["attribute", "null", "nonnull", "editor"],
+	"category": "editor",
+	"dependencies": {}
+}
