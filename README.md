@@ -7,3 +7,11 @@ The script will also produce an error when you play the game in the editor or wh
 This is handy to make sure something doesn't get unassigned by accident. You can also check wether an object is still in use or not by removing it, and then making a build, and see if you get any errors for unassigned references.
 
 Fields with unassigned references many times only have one reference you could possibly assign to it; a `GameManager` field probably wants to refer to the `GameManager` MonoBehaviour in the scene, and a `LocalizationsHandler` field probably wants to refer to the single `LocalizationsHandler` ScriptableObject in your assets. In these cases, the editor will show a "fill" button next to the field, which will automatically fill out the reference. If it could possibly refer to multiple things, like a Rigidbody reference, there won't be a fill button, since it can't be automatically filled.
+
+## Installation
+
+You can drop the NonNullAttribute.cs into your Assets folder (but it does *not* go in the Editor folder), or you can install it via the Unity package manager (recommended!) by adding this line to your Packages/manifest.json file:
+
+`"co.northplay.nonnull": "https://github.com/ulrikdamm/UnityNonNull.git"`
+
+And it will appear in the package manager and automatically install into your project.
