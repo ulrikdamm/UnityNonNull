@@ -30,7 +30,7 @@ public class DefaultObjectDrawer : PropertyDrawer {
         if (showWarning) {
             GUI.backgroundColor = Color.red;
             
-            var fillCandidate = findObjectToFill(property);
+            var fillCandidate = FindNonNull.findObjectToFill(property);
             if (fillCandidate != null) {
                 var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
                 var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
@@ -49,25 +49,6 @@ public class DefaultObjectDrawer : PropertyDrawer {
         
 		EditorGUI.EndProperty();
     }
-    
-    Object findObjectToFill(SerializedProperty property) {
-		if (property.propertyPath.Contains(".Array")) { return null; }
-		
-        var objectType = property.serializedObject.targetObject.GetType();
-        var fieldType = objectType.GetField(property.propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance).FieldType;
-        var objectsInScene = GameObject.FindObjectsOfType(fieldType);
-        var objectsInAssets = AssetDatabase.FindAssets("t:" + fieldType.Name);
-        
-        if (objectsInScene.Length + objectsInAssets.Length != 1) { return null; }
-        
-        if (objectsInScene.Length == 1) {
-            return objectsInScene[0];
-        } else {
-            var assetId = objectsInAssets[0];
-            var path = AssetDatabase.GUIDToAssetPath(assetId);
-            return AssetDatabase.LoadAssetAtPath(path, fieldType);
-        }
-    }
 }
 
 [CustomPropertyDrawer(typeof(AllowNullAttribute))]
@@ -84,11 +65,26 @@ public class NonNullAttributeDrawer : PropertyDrawer {
 	public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
 		EditorGUI.BeginProperty(position, label, property);
 		
-		if (property.objectReferenceValue == null) { GUI.backgroundColor = Color.red; }
+		if (property.objectReferenceValue == null) {
+			GUI.backgroundColor = Color.red;
+			
+			var fillCandidate = FindNonNull.findObjectToFill(property);
+			if (fillCandidate != null) {
+				var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
+				var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
+				
+				EditorGUI.PropertyField(propertyRect, property, label);
+				
+				GUI.backgroundColor = Color.white;
+				if (GUI.Button(buttonRect, "Fill")) { property.objectReferenceValue = fillCandidate; }
+			} else {
+				EditorGUI.PropertyField(position, property, label);
+				GUI.backgroundColor = Color.white;
+			}
+		} else {
+			EditorGUI.PropertyField(position, property, label);
+		}
 		
-		EditorGUI.PropertyField(position, property, label);
-		
-		GUI.backgroundColor = Color.white;
 		EditorGUI.EndProperty();
 	}
 }
@@ -168,5 +164,24 @@ class FindNonNull {
 			enumerateChildrenOf(obj.transform.GetChild(i).gameObject, callback);
 		}
 	}
+	
+	public static Object findObjectToFill(SerializedProperty property) {
+		if (property.propertyPath.Contains(".Array")) { return null; }
+		
+        var objectType = property.serializedObject.targetObject.GetType();
+        var fieldType = objectType.GetField(property.propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance).FieldType;
+        var objectsInScene = GameObject.FindObjectsOfType(fieldType);
+        var objectsInAssets = AssetDatabase.FindAssets("t:" + fieldType.Name);
+        
+        if (objectsInScene.Length + objectsInAssets.Length != 1) { return null; }
+        
+        if (objectsInScene.Length == 1) {
+            return objectsInScene[0];
+        } else {
+            var assetId = objectsInAssets[0];
+            var path = AssetDatabase.GUIDToAssetPath(assetId);
+            return AssetDatabase.LoadAssetAtPath(path, fieldType);
+        }
+    }
 }
 #endif
