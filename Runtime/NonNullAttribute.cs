@@ -24,7 +24,7 @@ public class DefaultObjectDrawer : PropertyDrawer {
         var showWarning = (
             property.propertyType == SerializedPropertyType.ObjectReference
             && property.objectReferenceValue == null
-            && property.serializedObject.targetObject.GetType().GetCustomAttribute(typeof(NonNullAttribute)) != null
+            && FindNonNull.classHasAttributeOfType(property.serializedObject.targetObject.GetType(), typeof(NonNullAttribute))
         );
         
         if (showWarning) {
@@ -106,7 +106,7 @@ class FindNonNull {
 		var anyNulls = false;
 		
 		enumerateAllComponentsInScene((GameObject obj, Component component) => {
-            var componentHasNonNull = component.GetType().GetCustomAttribute(typeof(NonNullAttribute)) != null;
+            var componentHasNonNull = classHasAttributeOfType(component.GetType(), typeof(NonNullAttribute));
 			var fields = component.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 			
 			for (var i = 0; i < fields.Length; i++) {
@@ -114,12 +114,11 @@ class FindNonNull {
 				if (!field.FieldType.IsClass) { continue; }
 				
                 if (!componentHasNonNull) {
-                    var nonNullAttr = field.GetCustomAttribute(typeof(NonNullAttribute));
-                    if (nonNullAttr == null) { continue; }
+					if (!fieldHasAttributeOfType(field, typeof(NonNullAttribute))) { continue; }
                 } else {
-                    var allowNullAttr = field.GetCustomAttribute(typeof(AllowNullAttribute));
-                    if (allowNullAttr != null) { continue; }
+                    if (fieldHasAttributeOfType(field, typeof(AllowNullAttribute))) { continue; }
                 }
+				var a = typeof(NonNullAttribute);
 				
 				var fieldValue = field.GetValue(component);
 				
@@ -135,6 +134,14 @@ class FindNonNull {
 		});
 		
 		return anyNulls;
+	}
+	
+	public static bool classHasAttributeOfType(System.Type classType, System.Type ofType) {
+		return (classType.GetCustomAttributes(ofType, false).Length > 0);
+	}
+	
+	static bool fieldHasAttributeOfType(FieldInfo field, System.Type type) {
+		return (field.GetCustomAttributes(type, false).Length > 0);
 	}
 	
 	static void enumerateAllComponentsInScene(System.Action<GameObject, Component> callback) {
