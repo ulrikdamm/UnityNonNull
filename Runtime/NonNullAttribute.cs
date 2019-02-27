@@ -171,18 +171,39 @@ class FindNonNull {
 		
         var objectType = property.serializedObject.targetObject.GetType();
         var fieldType = objectType.GetField(property.propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance).FieldType;
-        var objectsInScene = GameObject.FindObjectsOfType(fieldType);
-        var objectsInAssets = AssetDatabase.FindAssets("t:" + fieldType.Name);
-        
-        if (objectsInScene.Length + objectsInAssets.Length != 1) { return null; }
-        
-        if (objectsInScene.Length == 1) {
-            return objectsInScene[0];
-        } else {
-            var assetId = objectsInAssets[0];
-            var path = AssetDatabase.GUIDToAssetPath(assetId);
-            return AssetDatabase.LoadAssetAtPath(path, fieldType);
-        }
+		
+		if (fieldType.IsSubclassOf(typeof(Component))) {
+			return findSceneObjectToFill(fieldType);
+		}
+		
+		if (fieldType.IsSubclassOf(typeof(ScriptableObject))) {
+			return findAssetObjectToFill(fieldType);
+		}
+		
+        return null;
     }
+	
+	static Object findSceneObjectToFill(System.Type fieldType) {
+		Object objectInScene = null;
+		
+		var rootObjects = EditorSceneManager.GetActiveScene().GetRootGameObjects();
+		for (var i = 0; i < rootObjects.Length; i++) {
+			var candidates = rootObjects[i].GetComponentsInChildren(fieldType, includeInactive: true);
+			if (candidates.Length > 1) { return null; }
+			if (candidates.Length == 1 && objectInScene != null) { return null; }
+			if (candidates.Length == 1) { objectInScene = candidates[0]; }
+		}
+		
+		return objectInScene;
+	}
+	
+	static Object findAssetObjectToFill(System.Type fieldType) {
+		var objectsInAssets = AssetDatabase.FindAssets("t:" + fieldType.Name);
+		if (objectsInAssets.Length != 1) { return null; }
+		
+		var assetId = objectsInAssets[0];
+		var path = AssetDatabase.GUIDToAssetPath(assetId);
+		return AssetDatabase.LoadAssetAtPath(path, fieldType);
+	}
 }
 #endif
