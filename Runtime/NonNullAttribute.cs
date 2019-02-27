@@ -109,12 +109,13 @@ class FindNonNull {
 				var field = fields[i];
 				if (!field.FieldType.IsClass) { continue; }
 				
+				if (!fieldHasAttributeOfType(field, typeof(SerializeField)) && !field.Attributes.HasFlag(FieldAttributes.Public)) { continue; }
+				
                 if (!componentHasNonNull) {
 					if (!fieldHasAttributeOfType(field, typeof(NonNullAttribute))) { continue; }
                 } else {
                     if (fieldHasAttributeOfType(field, typeof(AllowNullAttribute))) { continue; }
                 }
-				var a = typeof(NonNullAttribute);
 				
 				var fieldValue = field.GetValue(component);
 				
