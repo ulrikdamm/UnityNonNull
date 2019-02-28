@@ -102,39 +102,55 @@ class FindNonNull {
 		var anyNulls = false;
 		
 		enumerateAllComponentsInScene((GameObject obj, Component component) => {
-            var componentHasNonNull = classHasAttributeOfType(component.GetType(), typeof(NonNullAttribute));
-			var fields = component.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-			
-			for (var i = 0; i < fields.Length; i++) {
-				var field = fields[i];
-				if (!field.FieldType.IsClass) { continue; }
-				
-				if (!fieldHasAttributeOfType(field, typeof(SerializeField)) && !field.Attributes.HasFlag(FieldAttributes.Public)) { continue; }
-				
-                if (!componentHasNonNull) {
-					if (!fieldHasAttributeOfType(field, typeof(NonNullAttribute))) { continue; }
-                } else {
-                    if (fieldHasAttributeOfType(field, typeof(AllowNullAttribute))) { continue; }
-                }
-				
-				var fieldValue = field.GetValue(component);
-				
-				if (fieldValue is UnityEngine.Object) {
-					if (((Object)fieldValue) != null) { continue; }
-				} else {
-					if (!object.ReferenceEquals(fieldValue, null)) { continue; }
-				}
-				
-				Debug.LogError("Missing reference for " + field.Name + " in " + component.GetType().Name + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, component);
-				anyNulls = true;
-			}
+            nullCheckComponent(obj, component, ref anyNulls);
 		});
 		
 		return anyNulls;
 	}
 	
+	static void nullCheckComponent(GameObject obj, Component component, ref bool anyNulls) {
+		var componentHasNonNull = classHasAttributeOfType(component.GetType(), typeof(NonNullAttribute));
+		var fields = component.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+		
+		for (var i = 0; i < fields.Length; i++) {
+			var field = fields[i];
+			if (!shouldNullCheckField(field, componentHasNonNull)) { continue; }
+			
+			var fieldValue = field.GetValue(component);
+			
+			if (fieldValue is UnityEngine.Object) {
+				if (((Object)fieldValue) != null) { continue; }
+			} else {
+				if (!object.ReferenceEquals(fieldValue, null)) { continue; }
+			}
+			
+			Debug.LogError("Missing reference for " + field.Name + " in " + component.GetType().Name + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, component);
+			anyNulls = true;
+		}
+	}
+	
+	static bool shouldNullCheckField(FieldInfo field, bool componentHasNonNull) {
+		if (!field.FieldType.IsClass) { return false; }
+		
+		var isSerialized = fieldHasAttributeOfType(field, typeof(SerializeField));
+		var isPublic = fieldAccessIs(field, FieldAttributes.Public);
+		if (!isSerialized && !isPublic) { return false; }
+		
+		if (!componentHasNonNull) {
+			if (!fieldHasAttributeOfType(field, typeof(NonNullAttribute))) { return false; }
+		} else {
+			if (fieldHasAttributeOfType(field, typeof(AllowNullAttribute))) { return false; }
+		}
+		
+		return true;
+	}
+	
 	public static bool classHasAttributeOfType(System.Type classType, System.Type ofType) {
 		return (classType.GetCustomAttributes(ofType, false).Length > 0);
+	}
+	
+	static bool fieldAccessIs(FieldInfo field, FieldAttributes attribute) {
+		return ((field.Attributes & FieldAttributes.FieldAccessMask) == attribute);
 	}
 	
 	static bool fieldHasAttributeOfType(FieldInfo field, System.Type type) {
