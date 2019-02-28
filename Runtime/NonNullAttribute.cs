@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -16,6 +14,32 @@ public class NonNullAttribute : PropertyAttribute {}
 public class AllowNullAttribute : PropertyAttribute {}
 
 #if UNITY_EDITOR
+static class NullFieldGUI {
+	public static void nullCheckedField(Rect position, SerializedProperty property, GUIContent label, bool showWarning) {
+		if (!showWarning) {
+			EditorGUI.PropertyField(position, property, label);
+			return;
+		}
+		
+		GUI.backgroundColor = Color.red;
+		
+		var fillCandidate = FindNonNull.findObjectToFill(property);
+		if (fillCandidate == null) {
+			EditorGUI.PropertyField(position, property, label);
+			GUI.backgroundColor = Color.white;
+			return;
+		}
+		
+		var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
+		var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
+		
+		EditorGUI.PropertyField(propertyRect, property, label);
+		
+		GUI.backgroundColor = Color.white;
+		if (GUI.Button(buttonRect, "Fill")) { property.objectReferenceValue = fillCandidate; }
+	}
+}
+
 [CustomPropertyDrawer(typeof(Object), useForChildren: true)]
 public class DefaultObjectDrawer : PropertyDrawer {
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
@@ -26,27 +50,8 @@ public class DefaultObjectDrawer : PropertyDrawer {
             && property.objectReferenceValue == null
             && FindNonNull.classHasAttributeOfType(property.serializedObject.targetObject.GetType(), typeof(NonNullAttribute))
         );
-        
-        if (showWarning) {
-            GUI.backgroundColor = Color.red;
-            
-            var fillCandidate = FindNonNull.findObjectToFill(property);
-            if (fillCandidate != null) {
-                var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
-                var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
-                
-                EditorGUI.PropertyField(propertyRect, property, label);
-                
-                GUI.backgroundColor = Color.white;
-                if (GUI.Button(buttonRect, "Fill")) { property.objectReferenceValue = fillCandidate; }
-            } else {
-                EditorGUI.PropertyField(position, property, label);
-                GUI.backgroundColor = Color.white;
-            }
-        } else {
-            EditorGUI.PropertyField(position, property, label);
-        }
-        
+		
+		NullFieldGUI.nullCheckedField(position, property, label, showWarning);
 		EditorGUI.EndProperty();
     }
 }
@@ -64,27 +69,8 @@ public class AllowNullAttributeDrawer : PropertyDrawer {
 public class NonNullAttributeDrawer : PropertyDrawer {
 	public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
 		EditorGUI.BeginProperty(position, label, property);
-		
-		if (property.objectReferenceValue == null) {
-			GUI.backgroundColor = Color.red;
-			
-			var fillCandidate = FindNonNull.findObjectToFill(property);
-			if (fillCandidate != null) {
-				var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
-				var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
-				
-				EditorGUI.PropertyField(propertyRect, property, label);
-				
-				GUI.backgroundColor = Color.white;
-				if (GUI.Button(buttonRect, "Fill")) { property.objectReferenceValue = fillCandidate; }
-			} else {
-				EditorGUI.PropertyField(position, property, label);
-				GUI.backgroundColor = Color.white;
-			}
-		} else {
-			EditorGUI.PropertyField(position, property, label);
-		}
-		
+		var showWarning = (property.objectReferenceValue == null);
+		NullFieldGUI.nullCheckedField(position, property, label, showWarning);
 		EditorGUI.EndProperty();
 	}
 }
