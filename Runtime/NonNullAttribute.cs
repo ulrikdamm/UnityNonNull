@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Reflection;
 using UnityEditor.Callbacks;
+using System.Collections.Generic;
 #endif
 
 [System.AttributeUsage(System.AttributeTargets.Field | System.AttributeTargets.Class)]
@@ -12,6 +13,9 @@ public class NonNullAttribute : PropertyAttribute {}
 
 [System.AttributeUsage(System.AttributeTargets.Field)]
 public class AllowNullAttribute : PropertyAttribute {}
+
+[System.AttributeUsage(System.AttributeTargets.Field)]
+public class NonEmptyAttribute : PropertyAttribute {}
 
 #if UNITY_EDITOR
 static class NullFieldGUI {
@@ -75,6 +79,35 @@ public class NonNullAttributeDrawer : PropertyDrawer {
 	}
 }
 
+[CustomPropertyDrawer(typeof(NonEmptyAttribute))]
+public class NonEmptyAttributeDrawer : PropertyDrawer {
+	public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
+		EditorGUI.BeginProperty(position, label, property);
+		
+		bool showWarning;
+		
+		switch (property.propertyType) {
+			case SerializedPropertyType.String: showWarning = string.IsNullOrEmpty(property.stringValue); break;
+			case SerializedPropertyType.AnimationCurve: showWarning = (property.animationCurveValue == null || property.animationCurveValue.length == 0); break;
+			case SerializedPropertyType.LayerMask: showWarning = (property.intValue == 0); break;
+			case SerializedPropertyType.ArraySize: showWarning = (property.arraySize == 0); break;
+			case SerializedPropertyType.Color: showWarning = (property.colorValue == null || property.colorValue == new Color(0, 0, 0, 0)); break;
+			case SerializedPropertyType.Enum: showWarning = (property.enumValueIndex == 0); break;
+			case SerializedPropertyType.Integer: showWarning = (property.intValue == 0); break;
+			case SerializedPropertyType.Float: showWarning = (Mathf.Approximately((float)property.doubleValue, 0)); break;
+			case SerializedPropertyType.Vector2: showWarning = property.vector2Value == Vector2.zero; break;
+			case SerializedPropertyType.Vector3: showWarning = property.vector3Value == Vector3.zero; break;
+			// case SerializedPropertyType.Vector4: showWarning = property.vector4Value == Vector4.zero; break;
+			case SerializedPropertyType.Vector2Int: showWarning = property.vector2IntValue == Vector2Int.zero; break;
+			case SerializedPropertyType.Vector3Int: showWarning = property.vector3IntValue == Vector3Int.zero; break;
+			default: showWarning = false; break;
+		}
+		
+		NullFieldGUI.nullCheckedField(position, property, label, showWarning);
+		EditorGUI.EndProperty();
+	}
+}
+
 class FindNonNull {
     [PostProcessScene]
 	public static void scenePostProcess() {
@@ -100,27 +133,76 @@ class FindNonNull {
 		
 		for (var i = 0; i < fields.Length; i++) {
 			var field = fields[i];
-			if (!shouldNullCheckField(field, componentHasNonNull)) { continue; }
 			
-			var fieldValue = field.GetValue(component);
+			var isSerialized = fieldHasAttributeOfType(field, typeof(SerializeField));
+			var isPublic = fieldAccessIs(field, FieldAttributes.Public);
+			if (!isSerialized && !isPublic) { continue; }
 			
-			if (fieldValue is UnityEngine.Object) {
-				if (((Object)fieldValue) != null) { continue; }
-			} else {
-				if (!object.ReferenceEquals(fieldValue, null)) { continue; }
-			}
-			
-			Debug.LogError("Missing reference for " + field.Name + " in " + component.GetType().Name + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, component);
-			anyNulls = true;
+			nullCheckField(obj, component, field, componentHasNonNull, ref anyNulls);
+			emptyCheckField(obj, component, field, ref anyNulls);
 		}
+	}
+	
+	static void emptyCheckField(GameObject obj, Component component, FieldInfo field, ref bool anyNulls) {
+		if (!fieldHasAttributeOfType(field, typeof(NonEmptyAttribute))) { return; }
+		
+		var fieldValue = field.GetValue(component);
+		
+		if (fieldValue is string && string.IsNullOrEmpty((string)fieldValue)) {
+			logError("Empty string", obj, component, field);
+		} else if (fieldValue is AnimationCurve && (fieldValue == null || ((AnimationCurve)fieldValue).length == 0)) {
+			logError("Empty animation curve", obj, component, field);
+		} else if (fieldValue is LayerMask && (fieldValue == null || ((LayerMask)fieldValue) == 0)) {
+			logError("Unspecified layer mask", obj, component, field);
+		} else if (fieldValue is System.Array && (fieldValue == null || ((System.Array)fieldValue).Length == 0)) {
+			logError("Empty array", obj, component, field);
+		} else if (fieldValue is System.Collections.IList && (fieldValue == null || ((System.Collections.IList)fieldValue).Count == 0)) {
+			logError("Empty list", obj, component, field);
+		} else if (fieldValue is Color && (fieldValue == null || ((Color)fieldValue) == new Color(0, 0, 0, 0))) {
+			logError("No color", obj, component, field);
+		} else if (fieldValue != null && fieldValue.GetType().IsEnum && ((int)fieldValue) == 0) {
+			logError("Empty enum value", obj, component, field);
+		} else if (fieldValue is int && ((int)fieldValue) == 0) {
+			logError("Zero integer value", obj, component, field);
+		} else if (fieldValue is float && Mathf.Approximately((float)fieldValue, 0)) {
+			logError("Zero float value", obj, component, field);
+		} else if (fieldValue is double && (double)fieldValue == 0) {
+			logError("Zero double value", obj, component, field);
+		} else if (isEmptyVector(fieldValue)) {
+			logError("Empty vector value", obj, component, field);
+		} else {
+			return;
+		}
+		
+		anyNulls = true;
+	}
+	
+	static bool isEmptyVector(object value) {
+		if (value is Vector2 && (Vector2)value == Vector2.zero) { return true; }
+		if (value is Vector2Int && (Vector2Int)value == Vector2Int.zero) { return true; }
+		if (value is Vector3 && (Vector3)value == Vector3.zero) { return true; }
+		if (value is Vector3Int && (Vector3Int)value == Vector3Int.zero) { return true; }
+		if (value is Vector4 && (Vector4)value == Vector4.zero) { return true; }
+		return false;
+	}
+	
+	static void nullCheckField(GameObject obj, Component component, FieldInfo field, bool componentHasNonNull, ref bool anyNulls) {
+		if (!shouldNullCheckField(field, componentHasNonNull)) { return; }
+		
+		var fieldValue = field.GetValue(component);
+		
+		if (fieldValue is UnityEngine.Object) {
+			if (((Object)fieldValue) != null) { return; }
+		} else {
+			if (!object.ReferenceEquals(fieldValue, null)) { return; }
+		}
+		
+		logError("Missing reference", obj, component, field);
+		anyNulls = true;
 	}
 	
 	static bool shouldNullCheckField(FieldInfo field, bool componentHasNonNull) {
 		if (!field.FieldType.IsClass) { return false; }
-		
-		var isSerialized = fieldHasAttributeOfType(field, typeof(SerializeField));
-		var isPublic = fieldAccessIs(field, FieldAttributes.Public);
-		if (!isSerialized && !isPublic) { return false; }
 		
 		if (!componentHasNonNull) {
 			if (!fieldHasAttributeOfType(field, typeof(NonNullAttribute))) { return false; }
@@ -169,6 +251,7 @@ class FindNonNull {
 	}
 	
 	public static Object findObjectToFill(SerializedProperty property) {
+		if (property.propertyType != SerializedPropertyType.ObjectReference) { return null; }
 		if (property.propertyPath.Contains(".Array")) { return null; }
 		
         var objectType = property.serializedObject.targetObject.GetType();
@@ -206,6 +289,10 @@ class FindNonNull {
 		var assetId = objectsInAssets[0];
 		var path = AssetDatabase.GUIDToAssetPath(assetId);
 		return AssetDatabase.LoadAssetAtPath(path, fieldType);
+	}
+	
+	static void logError(string error, GameObject obj, Component component, FieldInfo field) {
+		Debug.LogError(error + " for " + field.Name + " in " + component.GetType().Name + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, component);
 	}
 }
 #endif
