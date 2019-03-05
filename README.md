@@ -12,6 +12,8 @@ This is handy to make sure something doesn't get unassigned by accident. You can
 
 Fields with unassigned references many times only have one reference you could possibly assign to it; a `GameManager` field probably wants to refer to the `GameManager` MonoBehaviour in the scene, and a `LocalizationsHandler` field probably wants to refer to the single `LocalizationsHandler` ScriptableObject in your assets. In these cases, the editor will show a "fill" button next to the field, which will automatically fill out the reference. If it could possibly refer to multiple things, like a Rigidbody reference, there won't be a fill button, since it can't be automatically filled.
 
+For value types, the package comes with a `[NonEmpty]` attribute, which can be used to check that lists and strings aren't empty, colors aren't unassigned, enums aren't the default case, numbers aren't zero, and so on.
+
 ## Installation
 
 You can drop the NonNullAttribute.cs into your Assets folder (but it does *not* go in the Editor folder), or you can install it via the Unity package manager (recommended!) by adding this line to your Packages/manifest.json file:
