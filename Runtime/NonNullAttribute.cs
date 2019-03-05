@@ -69,7 +69,7 @@ public class AllowNullAttributeDrawer : PropertyDrawer {
 public class NonNullAttributeDrawer : PropertyDrawer {
 	public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
 		EditorGUI.BeginProperty(position, label, property);
-		var showWarning = (property.objectReferenceValue == null);
+		var showWarning = (property.propertyType == SerializedPropertyType.ObjectReference && property.objectReferenceValue == null);
 		NullFieldGUI.nullCheckedField(position, property, label, showWarning);
 		EditorGUI.EndProperty();
 	}
