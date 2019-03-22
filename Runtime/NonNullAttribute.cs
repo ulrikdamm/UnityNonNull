@@ -128,6 +128,12 @@ class FindNonNull {
 	}
 	
 	static void nullCheckComponent(GameObject obj, Component component, ref bool anyNulls) {
+		if (component == null) {
+			logError("Missing script for component", obj);
+			anyNulls = true;
+			return;
+		}
+		
 		var componentHasNonNull = classHasAttributeOfType(component.GetType(), typeof(NonNullAttribute));
 		var fields = component.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 		
@@ -293,6 +299,10 @@ class FindNonNull {
 	
 	static void logError(string error, GameObject obj, Component component, FieldInfo field) {
 		Debug.LogError(error + " for " + field.Name + " in " + component.GetType().Name + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, component);
+	}
+	
+	static void logError(string error, GameObject obj) {
+		Debug.LogError(error + " on " + obj.name + " in scene " + EditorSceneManager.GetActiveScene().name, obj);
 	}
 }
 #endif
