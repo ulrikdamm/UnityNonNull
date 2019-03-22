@@ -127,6 +127,30 @@ class FindNonNull {
 		return anyNulls;
 	}
 	
+    [MenuItem("Assets/NonNull/Check for unassigned references in all scenes in build settings")]
+	public static void findAllNonNullsInAllScenes() {
+		var scenes = EditorBuildSettings.scenes;
+		
+		if (scenes.Length == 0) {
+			Debug.Log("No scenes in build settings, so no scenes checked.");
+			return;
+		}
+		
+        for (int i = 0; i < scenes.Length; i++) {
+            var scene = scenes[i];
+            
+            if (EditorUtility.DisplayCancelableProgressBar("Checking all scenes", scene.path, i / (float)scenes.Length)) { 
+                EditorUtility.ClearProgressBar();
+                return; 
+            }
+			
+            EditorSceneManager.OpenScene(scene.path, OpenSceneMode.Single);
+			findAllNonNulls();
+		}
+		
+		EditorUtility.ClearProgressBar();
+	}
+	
 	static void nullCheckComponent(GameObject obj, Component component, ref bool anyNulls) {
 		if (component == null) {
 			logError("Missing script for component", obj);
