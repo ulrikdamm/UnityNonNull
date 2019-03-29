@@ -27,20 +27,21 @@ static class NullFieldGUI {
 		
 		GUI.backgroundColor = Color.red;
 		
-		var fillCandidate = FindNonNull.findObjectToFill(property);
+		string fillButtonText;
+		var fillCandidate = FindNonNull.findObjectToFill(property, out fillButtonText);
 		if (fillCandidate == null) {
 			EditorGUI.PropertyField(position, property, label);
 			GUI.backgroundColor = Color.white;
 			return;
 		}
 		
-		var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 40, height = position.height };
-		var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 40 - 8, height = position.height };
+		var propertyRect = new Rect { x = position.x, y = position.y, width = position.width - 45, height = position.height };
+		var buttonRect = new Rect { x = position.x + propertyRect.width + 8, y = position.y, width = 45 - 8, height = position.height };
 		
 		EditorGUI.PropertyField(propertyRect, property, label);
 		
 		GUI.backgroundColor = Color.white;
-		if (GUI.Button(buttonRect, "Fill")) { property.objectReferenceValue = fillCandidate; }
+		if (GUI.Button(buttonRect, fillButtonText)) { property.objectReferenceValue = fillCandidate; }
 	}
 }
 
@@ -280,7 +281,8 @@ class FindNonNull {
 		}
 	}
 	
-	public static Object findObjectToFill(SerializedProperty property) {
+	public static Object findObjectToFill(SerializedProperty property, out string actionName) {
+		actionName = null;
 		if (property.propertyType != SerializedPropertyType.ObjectReference) { return null; }
 		if (property.propertyPath.Contains(".Array")) { return null; }
 		
@@ -288,10 +290,21 @@ class FindNonNull {
         var fieldType = objectType.GetField(property.propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance).FieldType;
 		
 		if (fieldType.IsSubclassOf(typeof(Component))) {
+			var component = property.serializedObject.targetObject as Component;
+			if (component != null) {
+				var components = component.GetComponents(fieldType);
+				if (components.Length == 1) {
+					actionName = "This";
+					return components[0];
+				}
+			}
+			
+			actionName = "Fill";
 			return findSceneObjectToFill(fieldType);
 		}
 		
 		if (fieldType.IsSubclassOf(typeof(ScriptableObject))) {
+			actionName = "Fill";
 			return findAssetObjectToFill(fieldType);
 		}
 		
