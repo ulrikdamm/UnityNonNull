@@ -281,13 +281,26 @@ class FindNonNull {
 		}
 	}
 	
+	static FieldInfo getField(string propertyPath, System.Type fromType) {
+		var field = fromType.GetField(propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance);
+		if (field != null) { return field; }
+		
+		var baseType = fromType.BaseType;
+		if (baseType != null && baseType != typeof(object)) { return getField(propertyPath, baseType); }
+		
+		return null;
+	}
+	
 	public static Object findObjectToFill(SerializedProperty property, out string actionName) {
 		actionName = null;
 		if (property.propertyType != SerializedPropertyType.ObjectReference) { return null; }
 		if (property.propertyPath.Contains(".Array")) { return null; }
 		
         var objectType = property.serializedObject.targetObject.GetType();
-        var fieldType = objectType.GetField(property.propertyPath, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy | BindingFlags.Instance).FieldType;
+		var field = getField(property.propertyPath, fromType: objectType);
+		if (field == null) { return null; }
+		
+        var fieldType = field.FieldType;
 		
 		if (fieldType.IsSubclassOf(typeof(Component))) {
 			var component = property.serializedObject.targetObject as Component;
